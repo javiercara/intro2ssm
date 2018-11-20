@@ -1,0 +1,324 @@
+---
+title: "Global Warming: maximum likelihood estimation (Newton-Raphson)"
+author: "Javier Cara"
+date: "Nov 2018"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data
+
+- Global temperature series from 1880 to 2015:
+    - **globaltemp**: global mean land-ocean temperature index data.
+    - **globaltempl**: surface air temperature index data using only meteorological satation data.
+
+```{r}
+# more details in package 'astsa'
+load("globtemp.rda")
+load("globtempl.rda")
+y1 = globtemp
+y2 = globtempl
+ts.plot(y1,y2, col = c(4,3))
+legend("topleft", legend = c("land-ocean index","land-only index"), col = c(4,3), lty = 1)
+```
+
+- We are going to use data from 1880 to 2005 to estimate a state-space model. Then, 2006 to 2015 will be predicted using this model.
+
+```{r}
+# number of years to predict
+num_pred = 2015-2006+1
+```
+
+- Multivariate data:
+
+```{r}
+y = rbind(y1[1:(length(y1)-num_pred)],y2[1:(length(y1)-num_pred)])
+ny = nrow(y)
+nt = ncol(y)
+```
+
+```{r}
+# for comparison, data to be predicted
+ya = rbind(y1[(nt+1):(nt+num_pred)],y2[(nt+1):(nt+num_pred)])
+```
+
+# Model
+
+$$
+\begin{bmatrix} 
+y_{1,t} \\
+y_{2,t}
+\end{bmatrix}
+= 
+\begin{bmatrix} 
+c_1 \\
+c_2
+\end{bmatrix}
+x_t + 
+\begin{bmatrix} 
+v_{1,t} \\
+v_{2,t}
+\end{bmatrix}
+, \quad v_t \sim N \left(  
+\begin{bmatrix} 
+0 \\
+0
+\end{bmatrix}
+,
+\begin{bmatrix} 
+r_{11} & r_{12} \\
+r_{12} & r_{22}
+\end{bmatrix}
+\right)
+$$
+
+$$
+x_{t+1} = a x_{t} + w_t, \quad w_t \sim N(0,Q)
+$$
+
+$$
+x_1 \sim N(m_1,P_1)
+$$
+
+- Parameters
+
+$$
+\theta = \{a,Q,c_1,c_2,r_{11},r_{12},r_{22},m_1,P_1 \}
+$$
+
+- The number of states is
+
+```{r}
+nx = 1
+```
+
+# MLE using Newton-Raphson
+
+- Definition of the log-likelihood function:
+
+```{r}
+logLikelihood <- function(param){
+  A = param[1]
+  Q = param[2]^2
+  C = matrix(c(param[3],param[4]),nrow=2)
+  Rc = matrix(c(param[5],param[6],0,param[7]),nrow=2) # cholesky factorization
+  R = Rc %*% t(Rc)
+  m1 = param[8]
+  P1 = param[9]^2
+  kf = emssm::ACQR_kfilter(y,A,C,Q,R,m1,P1,nx,ny)
+  return(-kf$loglik) # minus loglik because optim finds the minimum
+}
+```
+
+- Starting values:
+
+```{r}
+# param = {phi,Q^{1/2},R^{1/2},m1,P1^{1/2}}
+init_par = c(1,1,1,1,1,1,1,0,1)
+```
+
+- Estimation:
+
+```{r}
+ssm_e = optim(init_par,logLikelihood, gr = NULL, method = "BFGS", hessian = TRUE,
+               control = list(trace=1, REPORT = 1, maxit = 20))
+```
+
+- The estimates of the parameters are:
+
+```{r}
+ssm_e$par
+```
+
+- Or in terms of the parameters of the model:
+
+```{r}
+(Ae = ssm_e$par[1])
+```
+
+```{r}
+(Qe = ssm_e$par[2]^2)
+```
+
+```{r}
+(Ce = matrix(c(ssm_e$par[3],ssm_e$par[4]), nrow = 2))
+```
+
+```{r}
+Rc = matrix(c(ssm_e$par[5],ssm_e$par[6],0,ssm_e$par[7]),nrow=2) # Cholesky factor
+(Re = Rc %*% t(Rc))
+```
+
+```{r}
+(m1e = ssm_e$par[8])
+```
+
+```{r}
+(P1e = ssm_e$par[9]^2)
+```
+
+# Estimated time series
+
+```{r}
+kf <- emssm::ACQR_kfilter(y,Ae,Ce,Qe,Re,m1e,P1e,nx,ny)
+ye <- Ce %*% kf$xtt1[,-nt]
+```
+
+- Standar error of the estimated values
+
+```{r}
+ye_se = matrix(0, nrow = ny, ncol = nt)
+for (t in 1:nt){
+  ye_var = Ce %*% kf$Ptt1[,,t] %*% t(Ce) + Re # variance of the estimated values
+  ye_se[,t] = sqrt(diag(ye_var))
+}
+```
+
+- Confidence intervals of the estimated values
+
+```{r}
+alpha = 0.05
+ye1 = ye - qnorm(1-alpha/2)*ye_se
+ye2 = ye + qnorm(1-alpha/2)*ye_se
+```
+
+- Plots
+
+```{r}
+plot(y[1,], type="l", ylim = c(-1,1), ylab = "land-ocean index", xlab = "Time", col = 4)
+lines(ye[1,], col = "gray", lwd = 2)
+legend("topleft", legend = c("measured data","estimated data"), col = c("black","gray"), lty = 1)
+tt = 1:nt
+xx = c(tt, rev(tt))
+yy = c(ye1[1,], rev(ye2[1,]))
+polygon(xx,yy, border = NA, col = gray(0.7, alpha = 0.3))
+```
+
+```{r}
+plot(y[2,], type="l", ylim = c(-1,1), ylab = "land-only index", xlab = "Time", col = 3)
+lines(ye[2,], col = "gray", lwd = 2)
+legend("topleft", legend = c("measured data","estimated data"), col = c("black","gray"), lty = 1)
+tt = 1:nt
+xx = c(tt, rev(tt))
+yy = c(ye1[2,], rev(ye2[2,]))
+polygon(xx,yy, border = NA, col = gray(0.7, alpha = 0.3))
+```
+
+- Mean square errors
+
+```{r}
+apply((y-ye)^2,1,mean)
+```
+
+
+# Checking the residuals
+
+```{r}
+res <- y - ye
+```
+
+```{r}
+plot(res[1,], type = 'l', ylab = "Residuals of land-ocean index", col = 4)
+```
+
+```{r}
+plot(res[2,], type = 'l', ylab = "Residuals of land-only index", col = 3)
+```
+
+- The residuals must be white noise
+
+```{r}
+acf(res[1,])
+```
+
+```{r}
+acf(res[2,])
+```
+
+# Predicting new values
+
+## Year by year
+
+```{r}
+yp = matrix(0, nrow = ny, ncol = num_pred)
+ypi1 = matrix(0, nrow = ny, ncol = num_pred)
+ypi2 = matrix(0, nrow = ny, ncol = num_pred)
+for (t in 1:num_pred){
+  y_upd = cbind(y,ya[,t-1]) # updated data
+  pred = emssm::ACQR_predict(y_upd,Ae,Ce,Qe,Re,m1e,P1e,nx,ny,n_ahead=1)
+  yp[,t] = pred$yp
+  ypi1[,t] = pred$ypi1
+  ypi2[,t] = pred$ypi2
+}
+```
+
+
+```{r}
+plot(y[1,], type="l", ylim = c(-1,1), xlim = c(0,140), ylab = "land-ocean index", xlab = "Time", col = 4)
+lines((nt+1):(nt+num_pred),ya[1,], col = 4, lty = 3, lwd = 2)
+lines((nt+1):(nt+num_pred), yp[1,], col = "gray", lwd = 2)
+tt = (nt+1):(nt+num_pred)
+xx = c(tt, rev(tt))
+yy = c(ypi1[1,], rev(ypi2[1,]))
+polygon(xx,yy, border = NA, col = gray(0.7, alpha = 0.3))
+```
+
+```{r}
+plot(y[2,], type="l", ylim = c(-1,1), xlim = c(0,140), ylab = "land-only index", xlab = "Time", col = 3)
+lines((nt+1):(nt+num_pred),ya[2,], col = 3, lty = 3, lwd = 2)
+lines((nt+1):(nt+num_pred), yp[2,], col = "gray", lwd = 2)
+tt = (nt+1):(nt+num_pred)
+xx = c(tt, rev(tt))
+yy = c(ypi1[2,], rev(ypi2[2,]))
+polygon(xx,yy, border = NA, col = gray(0.7, alpha = 0.3))
+```
+
+- Prediction errors:
+
+```{r}
+apply((ya-yp)^2,1,mean)
+```
+
+
+## Long term prediction
+
+```{r}
+pred = emssm::ACQR_predict(y,Ae,Ce,Qe,Re,m1e,P1e,nx,ny,n_ahead=num_pred)
+```
+
+
+```{r}
+plot(y[1,], type="l", ylim = c(-1,1), xlim = c(0,140), ylab = "land-ocean index", xlab = "Time", col = 4)
+lines((nt+1):(nt+num_pred),ya[1,], col = 4, lty = 3, lwd = 2)
+lines((nt+1):(nt+num_pred), pred$yp[1,], col = "gray", lwd = 2)
+tt = (nt+1):(nt+num_pred)
+xx = c(tt, rev(tt))
+yy = c(pred$ypi1[1,], rev(pred$ypi2[1,]))
+polygon(xx,yy, border = NA, col = gray(0.7, alpha = 0.3))
+```
+
+```{r}
+plot(y[2,], type="l", ylim = c(-1,1), xlim = c(0,140), ylab = "land-only index", xlab = "Time", col = 3)
+lines((nt+1):(nt+num_pred),ya[2,], col = 3, lty = 3, lwd = 2)
+lines((nt+1):(nt+num_pred), pred$yp[2,], col = "gray", lwd = 2)
+tt = (nt+1):(nt+num_pred)
+xx = c(tt, rev(tt))
+yy = c(pred$ypi1[2,], rev(pred$ypi2[2,]))
+polygon(xx,yy, border = NA, col = gray(0.7, alpha = 0.3))
+```
+
+- Prediction errors:
+
+```{r}
+apply((ya-pred$yp)^2,1,mean)
+```
+

@@ -1,0 +1,36 @@
+---
+title: "Estimation and prediction of state space models"
+author: "Javier Cara"
+date: "Nov 2018"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+<br>
+
+# Contents
+
+1. [Introduction](01_intro.html).
+
+2. Univariate time series: AR(1) with noisy observations.
+    a. [Simulation](noisyAR1_simula.html)
+    b. [Applying the Kalman filter and smoother](noisyAR1_kalman.html)
+    c. [Maximum likelihood estimation using Newton-Raphson algorithm](noisyAR1_mle_newton.html)
+    d. [Maximum likelihood estimation using the EM algorithm](noisyAR1_mle_em.html)
+    
+3. Multivariate time series: Global Warming
+    a. [Maximum likelihood estimation using Newton-Raphson algorithm](globalWarm_mle_newton.html)
+    b. [Maximum likelihood estimation using the EM algorithm](globalWarm_mle_em.html)
+    
+4. Time series with regression variables
+    a. [Maximum likelihood estimation using the EM algorithm](data_temp.html)
+    
+    

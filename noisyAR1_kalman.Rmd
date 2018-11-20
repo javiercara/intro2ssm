@@ -1,0 +1,84 @@
+---
+title: "AR(1) + noisy: filtering, smoothing and forecasting"
+author: "Javier Cara"
+date: "20 Nov 2018"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data
+
+```{r}
+load("noisyAR1.RData")
+```
+
+# Filtering, smoothing and forecasting
+
+```{r}
+library(emssm)
+y = noisyAR1$y
+A = noisyAR1$A
+C = noisyAR1$C
+Q = noisyAR1$Q
+R = noisyAR1$R
+x10 = noisyAR1$m1
+P10 = noisyAR1$P1
+kf = ACQR_kfilter(y, A, C, Q, R, x10, P10, nx = 1, ny = 1)
+ks = ACQR_ksmoother(A, kf$xtt, kf$Ptt, kf$xtt1, kf$Ptt1)
+```
+
+
+```{r}
+tt = 1:length(y) # time for the plots
+```
+
+## Prediction
+
+$$
+x_t^{t-1} = E[x_t|y_{1:t-1}], \quad P_t^{t-1} = Var[x_t|y_{1:t-1}]
+$$
+
+```{r}
+plot(tt, noisyAR1$x, main="Prediction", ylim=c(-5,10), type = "l", col = "gray", lwd = 3)
+  lines(kf$xtt1[1,], col = "blue")
+  lines(kf$xtt1[1,]+2*sqrt(kf$Ptt1[1,1,]), lty="dashed", col="blue")
+  lines(kf$xtt1[1,]-2*sqrt(kf$Ptt1[1,1,]), lty="dashed", col="blue")
+```
+
+## Filtering
+
+$$
+x_t^t = E[x_t|y_{1:t}], \quad P_t^t = Var[x_t|y_{1:t}]
+$$
+
+```{r}
+plot(tt, noisyAR1$x, main="Filter", ylim=c(-5,10), type = "l", col = "gray", lwd = 3)
+  lines(kf$xtt[1,], col = "blue")
+  lines(kf$xtt[1,]+2*sqrt(kf$Ptt[1,1,]), lty="dashed", col="blue")
+  lines(kf$xtt[1,]-2*sqrt(kf$Ptt[1,1,]), lty="dashed", col="blue")
+```
+
+## Smoothing
+
+$$
+x_t^n = E[x_t|y_{1:n}], \quad P_t^n = Var[x_t|y_{1:n}]
+$$
+
+```{r}
+plot(tt, noisyAR1$x,  main="Smoother", ylim=c(-5,10), type = "l", col = "gray", lwd = 3)
+  lines(ks$xtN[1,], col = "blue")
+  lines(ks$xtN[1,]+2*sqrt(ks$PtN[1,1,]), lty="dashed", col="blue")
+  lines(ks$xtN[1,]-2*sqrt(ks$PtN[1,1,]), lty="dashed", col="blue")
+```
+
+
+

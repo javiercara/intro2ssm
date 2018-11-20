@@ -1,0 +1,161 @@
+---
+title: "AR(1) + noise: maximum likelihood estimation (EM algorithm)"
+author: "Javier Cara"
+date: "20 Nov 2018"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Maximum Likelihood Estimation
+
+## Likelihood function
+
+- Previously it was shown that the likelihood function is:
+
+$$
+\ln L(\theta) = - \frac{1}{2} \sum_{t=1}^N \ln |\Sigma_t| - \frac{1}{2} \sum_{t=1}^{N} e_{t}' \Sigma_{t}^{-1}e_{t}
+$$
+
+
+- where $\theta$ are the unknown parameters of the model, $e_t$ the innovations and $\Sigma_t$ the variance of the innovations:
+
+$$
+\theta = \{A, C, Q, R, m_1, P_1 \}
+$$
+
+$$
+e_t \sim N(0,\Sigma_t), \ \Sigma_t = C P_{t}^{t-1} C' + R
+$$
+
+# The Expectation-Maximization (EM) algorithm
+
+- Loading the package:
+
+```{r}
+library(emssm)
+```
+
+- and the data:
+
+```{r}
+load("noisyAR1.RData")
+y = noisyAR1$y
+```
+
+- Starting values
+
+```{r}
+Ai = 0.1
+Ci = 1
+Qi = 0.5
+Ri = 0.5
+m1i = 0
+P1i = 0.5
+nx = 1
+ny = 1
+```
+
+- Estimation:
+
+```{r}
+ssm_e = ACQR_em(y,Ai,Ci,Qi,Ri,m1i,P1i,nx,ny,max_iter = 20,txo = T,Ce=F)
+```
+
+- The estimates of the parameters are:
+
+```{r}
+MLE = matrix(c(ssm_e$A, ssm_e$Q, ssm_e$R, ssm_e$m1, ssm_e$P1), ncol = 1)
+rownames(MLE) = c("A","Q","R","m1","P1")
+colnames(MLE) = "estimate"
+MLE
+```
+
+- We can check that the likelihood is maximized:
+
+```{r}
+plot(ssm_e$loglikv, type = "l", ylab = "log Likelihood", xlab = "iter")
+```
+
+
+# Asymptotic distributions of maximum likelihood estimators
+
+- Taking into account
+
+$$
+\hat \theta \sim N \left( \theta, I(\hat \theta)^{-1} \right)
+$$
+
+- the standard errors of the estimates are the square root of the diagonal elements of $I(\hat \theta)^{-1}$.
+
+- But the EM does not compute the Hessian, so we have to compute it
+
+```{r}
+# the parameters nust be a vector
+param = c(ssm_e$A[1,1], 
+          sqrt(ssm_e$Q[1,1]),
+          sqrt(ssm_e$R[1,1]),
+          ssm_e$m1,
+          sqrt(ssm_e$P1[1,1]))
+
+logLikelihood = function(param){
+  A = param[1]
+  C = 1
+  Q = param[2]^2
+  R = param[3]^2
+  m1 = param[4]
+  P1 = param[5]^2
+  nx = 1
+  ny = 1
+  kf = ACQR_kfilter(y,A,C,Q,R,m1,P1,nx,ny)
+  return(-kf$loglik)
+}
+( emhess = nlme::fdHess(param, function(param) logLikelihood(param)) )
+```
+
+- The square roots of the diagonal elements of $I(\hat \theta)^{-1}$ are estimators of the standard errors of $\hat \theta$:
+
+```{r}
+( se = sqrt(diag(solve(emhess$Hessian))) )
+```
+
+- Estimates and their standard errors are:
+
+```{r}
+( MLE = cbind(MLE,se = se) )
+```
+
+# Confidence interval
+
+- Using normal distribution for the MLE of $\hat \theta$, 
+
+$$
+\theta \in [\hat \theta - z_{\alpha/2} \cdot se(\hat \theta), \ \hat \theta + z_{\alpha/2} \cdot se(\hat \theta)]
+$$
+
+- For a 95% confidence interval:
+
+```{r}
+CI_1 = MLE[,1] - qnorm(1-0.05/2)*se
+CI_2 = MLE[,1]
++ qnorm(1-0.05/2)*se
+```
+
+- Adding these values to the table:
+
+```{r}
+( MLE = cbind(MLE,CI_1 = CI_1,CI_2 = CI_2) )
+```
+
+
+
+
+

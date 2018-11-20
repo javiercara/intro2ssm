@@ -1,0 +1,171 @@
+---
+title: "AR(1) + noise: maximum likelihood estimation (Newton-Raphson)"
+author: "Javier Cara"
+date: "Nov 2018"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Maximum Likelihood Estimation
+
+## Likelihood function
+
+- Likelihood is computed using the innovations $\{e_1, e_2, \ldots, e_N\}$. 
+
+- Innovations are obtained by the Kalman filter:
+
+$$
+e_t = y_t - C x_{t}^{t-1}
+$$
+
+- Innovations are independent Gausian random vectors with distribution:
+
+$$
+e_t \sim N(0,\Sigma_t), \ \Sigma_t = C P_{t}^{t-1} C' + R
+$$
+
+- Therefore:
+
+$$
+\ln L(\theta) = - \frac{1}{2} \sum_{t=1}^N \ln |\Sigma_t| - \frac{1}{2} \sum_{t=1}^{N} e_{t}' \Sigma_{t}^{-1}e_{t}
+$$
+
+
+- where $\theta$ are the unknown parameters of the model
+
+$$
+\theta = \{A, C, Q, R, m_1, P_1 \}
+$$
+
+## Newton-Raphson: theory
+
+## Newton-Raphson: using R
+
+- The data:
+
+```{r}
+load("noisyAR1.RData")
+y = noisyAR1$y
+```
+
+- The likelihood is computed usign the Kalman filter function in the package *emssm*:
+
+```{r}
+library(emssm)
+```
+
+- Then
+
+```{r}
+# Function to evaluate the likelihood
+# param = {phi,Q^{1/2},R^{1/2},m1,P1^{1/2}}
+# square roots because variances must be positive
+logLikelihood <- function(param){
+  A = param[1]
+  C = 1
+  Q = param[2]^2
+  R = param[3]^2
+  m1 = param[4]
+  P1 = param[5]^2
+  nx = 1
+  ny = 1
+  kf = ACQR_kfilter(y,A,C,Q,R,m1,P1,nx,ny)
+  return(-kf$loglik) # minus loglik because optim finds the minimum
+}
+```
+
+- Starting values:
+
+```{r}
+# param = {phi,Q^{1/2},R^{1/2},m1,P1^{1/2}}
+init_par = c(0.1,0.5,0.5,0,0.5)
+```
+
+- Estimation:
+
+```{r}
+ssm_e = optim(init_par,logLikelihood, gr = NULL, method = "BFGS", hessian = TRUE,
+               control = list(trace=1, REPORT = 1, maxit = 20))
+```
+
+- The estimates of the parameters are:
+
+```{r}
+MLE = matrix(c(ssm_e$par[1], ssm_e$par[2]^2, ssm_e$par[3]^2, ssm_e$par[4], ssm_e$par[5]^2), ncol = 1)
+rownames(MLE) = c("phi","Q","R","m1","P1")
+colnames(MLE) = "estimate"
+MLE
+```
+
+# Asymptotic distributions of maximum likelihood estimators
+
+- Let $\hat \theta$  be the estimator of $\theta$ obtained by maximizing the likelihood $L(\theta)$. Then, approximately,
+
+$$
+\hat \theta \sim N \left( \theta, I(\hat \theta)^{-1} \right)
+$$
+
+- where $I(\hat \theta)$ is the *observed* information matrix given by:
+
+$$
+I(\hat \theta) = -\frac{\partial^2 \ln L(\theta)}{\partial \theta \partial \theta'}
+$$
+
+- Threfore, the inverse of the (negative) Hessian of the likelihood is an estimator of the covariance matrix of $\hat \theta$. 
+
+```{r}
+ssm_e$hessian
+```
+
+- Hence, the square roots of the diagonal elements of $I(\hat \theta)^{-1}$ are estimators of the standard errors of $\hat \theta$:
+
+```{r}
+( se = sqrt(diag(solve(ssm_e$hessian))) )
+```
+
+- Estimates and their standard errors are:
+
+```{r}
+( MLE = cbind(MLE,se = se) )
+```
+
+# Confidence intervals
+
+- Using normal distribution for the MLE of $\hat \theta$, 
+
+$$
+\theta \in [\hat \theta - z_{\alpha/2} \cdot se(\hat \theta), \ \hat \theta + z_{\alpha/2} \cdot se(\hat \theta)]
+$$
+
+- For 95% confidence intervals, $\alpha = 0.05$, and $z_{\alpha/2}$ is equal to:
+
+```{r}
+( za = qnorm(1-0.05/2) )
+```
+
+- The confidence intervals are:
+
+```{r}
+CI_1 = MLE[,1] - za*se
+CI_2 = MLE[,1] + za*se
+```
+
+- Adding these values to the table:
+
+```{r}
+( MLE = cbind(MLE,CI_1 = CI_1,CI_2 = CI_2) )
+```
+
+
+
+
+

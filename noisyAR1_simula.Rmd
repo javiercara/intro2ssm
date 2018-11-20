@@ -1,0 +1,87 @@
+---
+title: "AR1 + noise: simulation"
+author: "Javier Cara"
+date: "20 Nov 2018"
+output: 
+  html_document:
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Model
+
+$$
+y_t = x_t + v_t, \quad v_t \sim N(0,R)
+$$
+
+$$
+x_{t+1} = \phi x_{t} + w_t, \quad w_t \sim N(0,Q)
+$$
+
+$$
+x_1 \sim N(m_1,P_1)
+$$
+
+
+# Simulation
+
+## Parameters
+
+```{r}
+set.seed(1)
+n = 100
+phi = 0.8
+# w ~ N(0,Q)
+Q = 1
+# v ~ N(0,R)
+R = 1
+# x1 ~ N(m1,P1)
+m1 = 0
+P1 = 1
+```
+
+## Simulation of w, v, x1:
+
+```{r}
+x1 = rnorm(1, mean = m1, sd = sqrt(P1))
+w = rnorm(n, mean = 0, sd = sqrt(Q))
+v = rnorm(n, mean = 0, sd = sqrt(R))
+```
+
+## Simulation of xt, yt:
+
+```{r}
+x = rep(0,n)
+x[1] = x1
+for (t in 1:(n-1)){
+  x[t+1] = phi*x[t] + w[t]
+}
+y = x + v
+```
+
+# Plots
+
+```{r}
+tt = 1:n
+plot(tt, x, type = "b", xlab = "time", ylab = "xt")
+```
+
+```{r}
+plot(tt, y, type = "b", xlab = "time", ylab = "yt")
+```
+
+# Save data
+
+```{r}
+noisyAR1 = list(n=n,A=phi,C=1,Q=Q,R=R,m1=m1,P1=P1,x=x,y=y,w=w,v=v)
+save(noisyAR1, file = "noisyAR1.RData")
+```
+
+
