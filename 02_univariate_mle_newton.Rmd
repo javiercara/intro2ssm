@@ -1,7 +1,7 @@
 ---
-title: "AR(1) + noise: maximum likelihood estimation (Newton-Raphson)"
+title: "Univariate time series: maximum likelihood estimation (Newton-Raphson)"
 author: "Javier Cara"
-date: "Nov 2018"
+date: "2020-02"
 output: 
   html_document:
     number_sections: true
@@ -69,7 +69,7 @@ library(emssm)
 # Function to evaluate the likelihood
 # param = {phi,Q^{1/2},R^{1/2},m1,P1^{1/2}}
 # square roots because variances must be positive
-logLikelihood <- function(param){
+logLikelihood <- function(param,y){
   A = param[1]
   C = 1
   Q = param[2]^2
@@ -93,7 +93,7 @@ init_par = c(0.1,0.5,0.5,0,0.5)
 - Estimation:
 
 ```{r}
-ssm_e = optim(init_par,logLikelihood, gr = NULL, method = "BFGS", hessian = TRUE,
+ssm_e = optim(init_par,logLikelihood, y = y, gr = NULL, method = "BFGS", hessian = TRUE,
                control = list(trace=1, REPORT = 1, maxit = 20))
 ```
 
@@ -120,7 +120,7 @@ $$
 I(\hat \theta) = -\frac{\partial^2 \ln L(\theta)}{\partial \theta \partial \theta'}
 $$
 
-- Threfore, the inverse of the (negative) Hessian of the likelihood is an estimator of the covariance matrix of $\hat \theta$. 
+- Therefore, the inverse of the (negative) Hessian of the likelihood is an estimator of the covariance matrix of $\hat \theta$. 
 
 ```{r}
 ssm_e$hessian

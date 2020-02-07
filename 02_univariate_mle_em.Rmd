@@ -1,7 +1,7 @@
 ---
-title: "AR(1) + noise: maximum likelihood estimation (EM algorithm)"
+title: "Univariate time series: maximum likelihood estimation (EM algorithm)"
 author: "Javier Cara"
-date: "20 Nov 2018"
+date: "2020-02"
 output: 
   html_document:
     number_sections: true
@@ -100,13 +100,13 @@ $$
 
 ```{r}
 # the parameters nust be a vector
-param = c(ssm_e$A[1,1], 
+param_e = c(ssm_e$A[1,1], 
           sqrt(ssm_e$Q[1,1]),
           sqrt(ssm_e$R[1,1]),
           ssm_e$m1,
           sqrt(ssm_e$P1[1,1]))
 
-logLikelihood = function(param){
+logLikelihood = function(param,y){
   A = param[1]
   C = 1
   Q = param[2]^2
@@ -118,7 +118,7 @@ logLikelihood = function(param){
   kf = ACQR_kfilter(y,A,C,Q,R,m1,P1,nx,ny)
   return(-kf$loglik)
 }
-( emhess = nlme::fdHess(param, function(param) logLikelihood(param)) )
+( emhess = nlme::fdHess(param_e, function(param,y){logLikelihood(param,y)},y = y) )
 ```
 
 - The square roots of the diagonal elements of $I(\hat \theta)^{-1}$ are estimators of the standard errors of $\hat \theta$:

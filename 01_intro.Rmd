@@ -1,8 +1,13 @@
 ---
 title: "Introduction to linear Gaussian State-Space Models"
 author: "Javier Cara"
-date: "6 de noviembre de 2018"
-output: html_document
+date: "2020-02"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
 ---
 
 ```{r setup, include=FALSE}
@@ -33,18 +38,16 @@ $$
 x_{t+1} = A x_{t} + w_{t}
 $$
 
-
-$$
-x_t \sim N(\mu_t, P_t)
-$$
-
-$$
-x_{0} \sim N(m_1, P_1)
-$$
-
 $$
 w_{t} \sim N(0,Q)
 $$
+
+$$
+x_{1} \sim N(m_1, P_1)
+$$
+
+- we assume $w_t$ and $v_t$ are uncorrelated:
+
 
 $$
 Cov[w_{t},v_{t}] = 0
@@ -62,22 +65,10 @@ $$
 - Markov property:
 
 $$
-E[x_{t+1}|x_{t}] = E[A x_{t} + w_{t}|x_{t}] = A x_{t} + E[w_{t}]  = Ax_{t}
-$$
-
-$$
-E[x_{t+1}|x_{t}, x_{t-1}] = E[A x_{t} + w_{t}|x_{t}, x_{t-1}] = A x_{t}
-$$
-
-$$ 
-\cdots \cdots
-$$
-
-$$
 E[x_{t+1}|x_{t}, x_{t-1},\cdots,x_{1}] = E[x_{t+1}|x_{t}]
 $$
 
-- Distribution of $x_t$:
+- Distribution of $x_t$. Defining $E[x_t] = m_t$, $Var[x_t] = P_t$:
 
 $$
 x_{1} \sim N(m_1, P_1), \ w_{1} \sim N(0,Q) \Rightarrow x_{2} = Ax_{1} + w_{1} \sim N(Am_1,AP_1A'+Q) = N(m_2,P_2)
@@ -92,17 +83,11 @@ $$
 $$
 
 $$
-x_{t+1} \sim N(m_{t}, P_{t}), \ w_{t} \sim N(0,Q) \Rightarrow x_{t+1} = Ax_{t} + w_{t} \sim N(Am_{t},AP_{t}A'+Q) = N(m_t,P_t)
-$$
-
-- that is:
-
-$$
-E[x_{t+1}] = E[Ax_{t}+w_{t}] \Rightarrow m_{t+1} = A m_{t}, \text{ with known } m_1.
+x_{t+1} \sim N(m_{t}, P_{t}), \ w_{t} \sim N(0,Q) \Rightarrow x_{t+1} = Ax_{t} + w_{t} \sim N(Am_{t},AP_{t}A'+Q) = N(m_{t+1},P_{t+1})
 $$
 
 $$
-Var[x_{t+1}] = Var[Ax_{t}+w_{t}] \Rightarrow P_{t+1} = A P_{t} A^T + Q, \text{ with known } P_1.
+\Rightarrow x_{t+1} \sim N(C m_t, A P_t A^T + Q)
 $$
 
 - Distribution of $y_t$:

@@ -1,7 +1,7 @@
 ---
-title: "Global Warming: maximum likelihood estimation (Newton-Raphson)"
+title: "Multivariate time series: maximum likelihood estimation (Newton-Raphson)"
 author: "Javier Cara"
-date: "Nov 2018"
+date: "2020-02"
 output: 
   html_document:
     number_sections: true
@@ -34,16 +34,20 @@ legend("topleft", legend = c("land-ocean index","land-only index"), col = c(4,3)
 - We are going to use data from 1880 to 2005 to estimate a state-space model. Then, 2006 to 2015 will be predicted using this model.
 
 ```{r}
+year1 = 1880 # start of data
+year2 = 2005 # end of data
+year3 = 2015 # end of prediction
+# number of years to estimate
+nt = year2 - year1 + 1
 # number of years to predict
-num_pred = 2015-2006+1
+num_pred = year3 - year2
 ```
 
 - Multivariate data:
 
 ```{r}
-y = rbind(y1[1:(length(y1)-num_pred)],y2[1:(length(y1)-num_pred)])
+y = rbind(y1[1:nt],y2[1:nt])
 ny = nrow(y)
-nt = ncol(y)
 ```
 
 ```{r}
@@ -92,7 +96,7 @@ $$
 - Parameters
 
 $$
-\theta = \{a,Q,c_1,c_2,r_{11},r_{12},r_{22},m_1,P_1 \}
+\theta = \{a,Q,c_1,c_2,r_{11},r_{21},r_{22},m_1,P_1 \}
 $$
 
 - The number of states is
@@ -106,7 +110,7 @@ nx = 1
 - Definition of the log-likelihood function:
 
 ```{r}
-logLikelihood <- function(param){
+logLikelihood <- function(param,y){
   A = param[1]
   Q = param[2]^2
   C = matrix(c(param[3],param[4]),nrow=2)
@@ -114,6 +118,8 @@ logLikelihood <- function(param){
   R = Rc %*% t(Rc)
   m1 = param[8]
   P1 = param[9]^2
+  nx = 1
+  ny = 2
   kf = emssm::ACQR_kfilter(y,A,C,Q,R,m1,P1,nx,ny)
   return(-kf$loglik) # minus loglik because optim finds the minimum
 }
@@ -123,13 +129,13 @@ logLikelihood <- function(param){
 
 ```{r}
 # param = {phi,Q^{1/2},R^{1/2},m1,P1^{1/2}}
-init_par = c(1,1,1,1,1,1,1,0,1)
+init_par = c(0.5,1,1,1,1,1,1,0,1)
 ```
 
 - Estimation:
 
 ```{r}
-ssm_e = optim(init_par,logLikelihood, gr = NULL, method = "BFGS", hessian = TRUE,
+ssm_e = optim(init_par,logLikelihood, y = y, gr = NULL, method = "BFGS", hessian = TRUE,
                control = list(trace=1, REPORT = 1, maxit = 20))
 ```
 
@@ -249,7 +255,9 @@ acf(res[2,])
 ## Year by year
 
 ```{r}
+# predictions
 yp = matrix(0, nrow = ny, ncol = num_pred)
+# confidence intervals
 ypi1 = matrix(0, nrow = ny, ncol = num_pred)
 ypi2 = matrix(0, nrow = ny, ncol = num_pred)
 for (t in 1:num_pred){
